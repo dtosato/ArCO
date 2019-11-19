@@ -21,20 +21,25 @@ ECCV, 2010.
  This code performs patch-based head pose detection given the a 50x50 image.
  Should you have any problems please email me at diego.tosato@univr.it
 
+## Data
+
+* [QMUL4PoseHeads](https://drive.google.com/open?id=0B0MZ5gr7K36SVFVjYVBpaTFuRFU)
+
 ## Demo code and images provides
 
 There is one complete script for learning and testing ARCO:
 
-1. Z_ARCO.m: this is the main script. It is able to learn and test a
+1. Download data.
+2. Z_ARCO.m: this is the main script. It is able to learn and test a
 multi-class Logitboost classifier on Riemannian Manifold.
-2. The variable 'experiment'  (in Z_ARCO.m) contains a path where all the
+3. The variable 'experiment'  (in Z_ARCO.m) contains a path where all the
 pre-computed parts of this framework are stored.
 Only the classification results are not computed in order to
 show you some qualitative results of this framework.
-3. If you want to test this framework on the complete test set, just change
+4. If you want to test this framework on the complete test set, just change
 the variable 'test_dir' from './QML4PoseHeads/test_demo' to
 './QML4PoseHeads/test'.
-4. If you want to see the statistics of this framework on the complete
+5. If you want to see the statistics of this framework on the complete
 test set without run testing, these are in [experiment
 '/full_test_results'].
 
