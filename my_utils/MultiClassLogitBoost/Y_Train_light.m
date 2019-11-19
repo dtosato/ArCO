@@ -1,0 +1,157 @@
+% *************************** Disclaimer ************************************** 
+% This program is distributed in the hope that it will be useful, but 
+% WITHOUT ANY WARRANTY; without even the implied warranty of  MERCHANTABILITY 
+% or FITNESS FOR A PARTICULAR PURPOSE. Feel free to use this code for academic 
+% purposes.  Please use the citation provided below.
+% 
+% The test part of this code takes 0.05 seconds per image on a Intel Xeon(R) 
+% CPU E5440 @2.83 GHz 8 GB RAM on Matlab 2009b. The most computationally expensive part of 
+% this code is the learning phase Y_train_light.m 
+% *****************************Copyright*********************************
+%   Copyright 2010 Diego Tosato
+%   $Revision: 4b$  $Date: 2010/02/25$
+% ***********************************************************************
+%   Y_Train_light training LOGITBOOST classifier on a d*(d+1)/2-dimensional 
+%   vector space.
+%
+% input:
+%   train_data      := training data
+%   num             := number of examples per class
+%   c_rate          := desired classification rate
+%   min_leaf        := minumum number of example per a tree leaf
+%   thr_leran       := learning rate
+%
+% output:
+%   F := A multi-class LogitBoost classifiers
+%*****************************Some ImportantReferences********************
+%   [1] Additive logistic regression: A statistical view of
+%   boosting; Friedman, J. and Hastie, T. and Tibshirani, R.; The annals of
+%   statistics}
+%*************************************************************************
+function F = Y_Train_light(train_data,num,c_rate,min_leaf,thr_leran)
+%% logitboost 
+J                   =   size(train_data,2); % number of classes
+N                   =   sum(num); % total number of examples
+offset              =   cumsum(num); offset(end) = []; offset = [0,offset];
+y                   =   zeros(N,1); % multi-class labels
+y_star              =   zeros(N,1); % binary labels
+z                   =   zeros(N,J); % response values
+w                   =   zeros(N,J); % weghits
+FkR                 =   zeros(N,J); % strong classifier
+p                   =   ones(N,J).*1/J; % posterior probability
+
+% labels inizialization
+for j = 1:J
+    y(offset(j)+1:offset(j)+num(j))         = j;
+    y_star(offset(j)+1:offset(j)+num(j),j)  = 1;
+end
+l                   =   0; % weak learners index
+F                   =   struct('g',[]); % final classifier
+main_test           =   zeros(100,1); % margin test
+g                   =   cell(J,1); % polynomual fitting
+fk                  =   zeros(N,J);
+cond_j              =   zeros(1,J);
+cond_j_prec         =   zeros(1,J);
+learning_ratio      =   1;
+
+
+
+%% --- model fitting settings
+% modelterms = [];
+% for i = 1:p_grad
+%     modelterms = [modelterms;eye(d).*i];
+% end
+% modelterms = [modelterms;zeros(1,d)];
+
+% % Automatically scale the independent variables to unit variance
+% stdind = sqrt(diag(cov(data)));
+% if any(stdind==0)
+%     warning 'Constant terms in the model must be entered using modelterms'
+%     stdind(stdind==0) = 1;
+% end
+% % scaled variables
+% data = data*diag(1./stdind);
+
+% weak learners training
+while ~main_test(l+1) && learning_ratio > thr_leran % main condition for passing the level
+    l       =   l+1;                    % instantiate a new weak learner
+    for j = 1:J % for each ACTIVE FG class
+        z(:,j)       = (y_star(:,j)-p(:,j))./...
+            (p(:,j).*(1-p(:,j))+eps);  % response values calculation
+        w(:,j)       = p(:,j).*(1-p(:,j));      %  weights calcualtion
+    end
+    
+    % response control
+    z(isnan(z))  = 0;
+    z(z == inf)  = 0;
+    z(z == -inf) = 0;
+    
+    %  threashold ratio
+    z(z > 4)              = 4;
+    z(z < -4)             = -4;
+    w(w < 2*eps)          = 2*eps;
+    fprintf('--| Weak learner %i\n',l);       
+    for j = 1:J
+        x_j      =  full(train_data{j});
+        % non linear regressor computation
+        g{j} = classregtree(x_j,z(:,j),'weights',w(:,j),'minleaf',min_leaf);
+        fk(:,j)  =  eval(g{j},x_j);
+    end
+    % building model
+    fk_sum  = 1/J * sum(fk,2);
+    for j = 1:J % for each ACTIVE FG class
+        fk(:,j)        =   (J-1)/(J)*(fk(:,j) - fk_sum);
+        FkR(:,j)      =   FkR(:,j) + fk(:,j);
+        if ~isreal(FkR(:))
+            disp('* FkR')
+        end
+    end
+    % posterior estimation
+    p = X_ComputePosterior(p,J,1:J,FkR);
+    
+    % stop condition computation
+    for j = 1:J
+        gt_pos = zeros(num(j),1);
+        for jj = 1:J
+            if j ~= jj
+                gt_pos =  gt_pos + double(p(offset(j)+1:offset(j)+num(j),j)> p(offset(j)+1:offset(j)+num(j),jj));
+            end
+        end
+        gt_pos(gt_pos ~= J-1) = 0;
+        gt_pos(gt_pos == J-1) = 1;
+        cond_j(j) = sum(gt_pos)/num(j); 
+    end
+    
+    % stop conditions
+    cond_all       = cond_j > c_rate;
+    main_test(l+1) = sum(cond_all) == J;
+    cond_j_diff    = cond_j - cond_j_prec;
+    learning_ratio = max(cond_j_diff);
+    
+    %update
+    cond_j_prec = cond_j;
+
+    % stats
+    for j = 1:J
+        disp(['accuracy(' num2str(j) '): ' num2str(cond_j(j)) '/' num2str(c_rate(j))])
+        disp(['learning rate(' num2str(j) '): ' num2str(cond_j_diff(j))])
+    end
+    
+    % save current weak classifier
+    F.g{l} = g;
+end 
+
+
+    function  p = X_ComputePosterior(p,n_goodClass,goodClass,FkR)
+        F_num                    =  exp(FkR(:,goodClass));
+        F_num (F_num == inf)     =  realmax;
+        F_den                    =  sum(exp(FkR(:,goodClass)),2);
+        F_den(F_den == inf)      =  realmax;
+        F_den                    =  repmat (F_den, 1, n_goodClass);
+        p(:,goodClass)        =   F_num./F_den;
+        p(p < 0) = 0;
+    end
+
+end
+
+

@@ -1,0 +1,60 @@
+function [y_out,y_confidence] = Y_Test_light(F_arr,x,K,J)
+% *************************** Disclaimer ************************************** 
+% This program is distributed in the hope that it will be useful, but 
+% WITHOUT ANY WARRANTY; without even the implied warranty of  MERCHANTABILITY 
+% or FITNESS FOR A PARTICULAR PURPOSE. Feel free to use this code for academic 
+% purposes.  Plase use the citation provided below.
+% 
+% The core part of this code takes 2 seconds per image on a Intel Xeon(R) 
+% CPU E5440 @2.83 GHz 8 GB RAM on Matlab 2009b. The most computationally expensive part of 
+% this code is the learning phase Y_train_light.m 
+% *****************************Copyright*********************************
+%   Copyright 2010 Diego Tosato
+%   $Revision: 4b$  $Date: 2010/02/25$
+% ************************************************************************
+%  Y_Test_light apply a multiclass logitboost classifier.
+%  Input:
+%   F    := Cascade of LogitBoost classifiers  
+%   x    := testing example to be classified
+%   bias := negative bias on classification result
+%
+%  Output:
+%    y_out := classification label
+%    y_confidence := classification confidence 
+%**************************************************************************
+k = 1; % level of cascade index
+while k <= K
+    F      =   F_arr{k}; % stron classifier at k-th level 
+    FkR    =   zeros(1,J); % final classification {class(sign)+confidence}
+    p      =   zeros(1,J); % posterior probability
+    fk     =   zeros(1,J); % weak classification response
+    for ll=1:size(F.g,2)
+        G = F.g{ll};
+        for j = 1:J
+            fk(:,j)  = eval(G{j},x');
+        end
+        % building model
+        fk_sum  = 1/J * sum(fk,2);
+        for j = 1:J % for each ACTIVE FG class
+            fk(j)        =   (J-1)/(J)*(fk(j) - fk_sum);
+            FkR(j)      =   FkR(j) + fk(j);
+            if ~isreal(FkR(:))
+                disp('* FkR')
+            end
+        end
+    end
+    p = X_ComputePosterior(p,J,1:J,FkR);
+    [y_confidence,y_out]        =   max(p);
+    k = k +1;
+end
+
+    function  p = X_ComputePosterior(p,n_goodClass,goodClass,FkR)
+        F_num                    =  exp(FkR(:,goodClass));
+        F_num (F_num == inf)     =  realmax;
+        F_den                    =  sum(exp(FkR(:,goodClass)),2);
+        F_den(F_den == inf)      =  realmax;
+        F_den                    =  repmat (F_den, 1, n_goodClass);
+        p(:,goodClass)        =   F_num./F_den; % probability of x being in class jth
+        p(p < 0) = 0;
+    end
+end
