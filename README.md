@@ -10,12 +10,6 @@ The test part of this code takes 0.05 seconds per image on a Intel Xeon(R)
 CPU E5440 @2.83 GHz 8 GB RAM on Matlab 2009b. The most computationally expensive part of
 this code is the learning phase `Y_train_light.m`
 
-## Citation
-
-Diego Tosato, Michela Farenzena, Mauro Spera, Marco Cristani, Vittorio Murino
-“Multi-class Classification on Riemannian Manifolds for Video Surveillance,”
-ECCV, 2010.  
-
 ## Performance
 
  This code performs patch-based head pose detection given the a 50x50 image.
@@ -45,3 +39,9 @@ test set without run testing, these are in [experiment
 
 This code is provided with a pre-computed training set and its learned
 classifier in order to directly test the classifier.
+
+## Citation
+
+Diego Tosato, Michela Farenzena, Mauro Spera, Marco Cristani, Vittorio Murino
+“Multi-class Classification on Riemannian Manifolds for Video Surveillance,”
+ECCV, 2010.  
